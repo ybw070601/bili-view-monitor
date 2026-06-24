@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 B站视频播放量监控 Web 应用
-主入口文件
+支持每30分钟自动更新所有今日视频的播放量
 """
 
 import os
@@ -15,6 +15,7 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func
 import requests
 from bs4 import BeautifulSoup
+from apscheduler.schedulers.background import BackgroundScheduler
 
 # 初始化 Flask 应用
 app = Flask(__name__)
@@ -133,8 +134,6 @@ def extract_bvid_from_url(url):
 
 def extract_fav_id_from_url(url):
     """从B站收藏夹URL中提取收藏夹ID"""
-    # 支持格式: https://www.bilibili.com/medialist/play/123456
-    # 或: https://www.bilibili.com/medialist/detail/ml123456
     match = re.search(r'/medialist/(?:play|detail)/(\d+)', url)
     if match:
         return match.group(1)
@@ -200,7 +199,6 @@ def get_fav_list(fav_id, page=1, page_size=20):
             result = data['data']
             videos = []
             for item in result.get('medias', []):
-                # 从收藏夹条目中提取BV号
                 bvid = item.get('bvid')
                 if bvid:
                     videos.append({
@@ -295,14 +293,12 @@ def get_or_create_daily_stat(video_id, target_date=None):
         return stat
 
     # 创建新的每日统计
-    # 获取当前播放量作为初始播放量
     video = Video.query.get(video_id)
     if not video:
         return None
 
     views = get_current_views(video.bvid)
     if views is None:
-        # 如果获取失败，使用0作为初始值
         views = 0
 
     stat = DailyStat(
@@ -337,7 +333,6 @@ def update_current_views(video_id):
         db.session.commit()
         return stat
     else:
-        # 如果今日没有记录，创建一条
         return get_or_create_daily_stat(video_id, today)
 
 
@@ -366,7 +361,6 @@ def get_video_dashboard_data(bvid):
     if not stat:
         return None
 
-    # 返回数据
     return {
         'video': video.to_dict(),
         'stat': stat.to_dict(),
@@ -387,7 +381,6 @@ def get_fav_dashboard_data(fav_id):
         if not bvid:
             continue
 
-        # 获取或创建视频
         video = get_or_create_video(bvid)
         if not video:
             continue
@@ -397,7 +390,6 @@ def get_fav_dashboard_data(fav_id):
         if not stat:
             continue
 
-        # 更新当前播放量（获取最新数据）
         views = get_current_views(bvid)
         if views is not None:
             stat.current_views = views
@@ -436,9 +428,7 @@ def dashboard():
     is_fav = False
 
     if bvid:
-        # 处理BV号
         if not is_bv_id(bvid):
-            # 尝试从URL中提取BV号
             if is_url(bvid):
                 extracted = extract_bvid_from_url(bvid)
                 if extracted:
@@ -454,7 +444,6 @@ def dashboard():
                 error = f'获取视频数据失败，请检查BV号是否正确：{bvid}'
 
     elif fav_id:
-        # 处理收藏夹号
         if is_url(fav_id):
             extracted = extract_fav_id_from_url(fav_id)
             if extracted:
@@ -539,6 +528,62 @@ def api_update_target():
             'bvid': video.bvid if video else '',
         }
     })
+
+
+# ==================== 定时任务：每30分钟自动更新所有今日视频 ====================
+
+def scheduled_update_all_videos():
+    """后台任务：更新今天所有视频的播放量"""
+    with app.app_context():
+        today = date.today()
+        # 只更新今日有统计记录的视频，避免遍历全部历史
+        videos_to_update = db.session.query(Video).join(DailyStat).filter(DailyStat.date == today).all()
+
+        if not videos_to_update:
+            print(f"[定时任务] {datetime.now()} - 今日暂无视频需要更新")
+            return
+
+        print(f"[定时任务] {datetime.now()} - 开始更新 {len(videos_to_update)} 个视频...")
+
+        for video in videos_to_update:
+            try:
+                views = get_current_views(video.bvid)
+                if views is not None:
+                    stat = DailyStat.query.filter_by(video_id=video.id, date=today).first()
+                    if stat:
+                        stat.current_views = views
+                        stat.last_updated = datetime.now()
+                        db.session.commit()
+                        print(f"  ✅ 更新成功: {video.title[:20]}... 当前播放量 {views}")
+                    else:
+                        # 如果今日没记录（极少情况），自动创建
+                        new_stat = DailyStat(
+                            video_id=video.id,
+                            date=today,
+                            initial_views=views,
+                            current_views=views,
+                            target=0
+                        )
+                        db.session.add(new_stat)
+                        db.session.commit()
+                time.sleep(0.5)  # 防B站限流
+            except Exception as e:
+                print(f"  ❌ 更新失败 {video.bvid}: {e}")
+
+        print(f"[定时任务] {datetime.now()} - 本轮更新完成")
+
+
+# 启动定时器（仅在非调试模式或首次启动时执行，避免重复）
+scheduler = BackgroundScheduler()
+scheduler.add_job(
+    func=scheduled_update_all_videos,
+    trigger="interval",
+    minutes=30,
+    id='bili_auto_update',
+    next_run_time=datetime.now()  # 启动后立即执行一次（可选）
+)
+scheduler.start()
+print("⏰ 定时任务已启动！每30分钟自动更新一次播放量。")
 
 
 # ==================== 启动应用 ====================
