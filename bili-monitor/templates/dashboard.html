@@ -1,4 +1,3 @@
-<!-- templates/dashboard.html -->
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -382,20 +381,15 @@
 
                 if (result.success) {
                     const d = result.data;
-                    // 更新当前播放量
                     document.getElementById(`current-${videoId}`).innerHTML = `<strong>${formatNumber(d.current_views)}</strong>`;
-                    // 更新增长
                     const growthEl = document.getElementById(`growth-${videoId}`);
                     const growth = d.growth;
                     growthEl.textContent = (growth > 0 ? '+' : '') + formatNumber(growth);
                     growthEl.style.color = growth > 0 ? '#48bb78' : growth < 0 ? '#fc8181' : '#a0aec0';
-                    // 更新达标状态
                     updateAchieved(videoId, d.achieved, d.target);
-                    // 更新初始播放量（可能跨天变化）
                     if (d.initial_views !== undefined) {
                         document.getElementById(`initial-${videoId}`).textContent = formatNumber(d.initial_views);
                     }
-                    // 显示成功提示（简单的闪烁）
                     const row = document.getElementById(`row-${videoId}`);
                     row.style.transition = 'background 0.3s';
                     row.style.background = '#f0fff4';
@@ -422,10 +416,8 @@
 
             if (videoIds.length === 0) return;
 
-            // 逐个刷新
             for (const vid of videoIds) {
                 await refreshVideo(vid);
-                // 间隔0.5秒避免请求过快
                 await new Promise(resolve => setTimeout(resolve, 500));
             }
         }
@@ -451,7 +443,6 @@
                 if (result.success) {
                     const d = result.data;
                     updateAchieved(videoId, d.achieved, target);
-                    // 显示成功提示
                     const inputEl = document.getElementById(`target-input-${videoId}`);
                     inputEl.style.borderColor = '#48bb78';
                     setTimeout(() => { inputEl.style.borderColor = ''; }, 800);
@@ -484,7 +475,6 @@
             return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
         }
 
-        // 支持按回车键更新目标
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Enter' && e.target && e.target.id && e.target.id.startsWith('target-input-')) {
                 const videoId = parseInt(e.target.id.replace('target-input-', ''));
@@ -492,13 +482,6 @@
                     updateTarget(videoId);
                 }
             }
-        });
-
-        // 页面加载后自动刷新所有视频（可选）
-        // 等待页面加载完成后执行
-        document.addEventListener('DOMContentLoaded', function() {
-            // 如果需要自动刷新，取消下面注释
-            // setTimeout(refreshAll, 2000);
         });
     </script>
 </body>
