@@ -1,0 +1,505 @@
+<!-- templates/dashboard.html -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数据仪表盘 - B站播放量监控</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        body {
+            background: #f0f2f5;
+            padding: 20px;
+        }
+        .dashboard-container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .nav-bar {
+            background: white;
+            border-radius: 16px;
+            padding: 16px 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .nav-bar .brand {
+            font-weight: 700;
+            font-size: 20px;
+            color: #fb7299;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .nav-bar .brand:hover { color: #e86080; }
+        .nav-bar .info-badge {
+            font-size: 14px;
+            color: #4a5568;
+            background: #f7f8fc;
+            padding: 6px 16px;
+            border-radius: 20px;
+        }
+        .stats-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .stats-summary .stat-card {
+            background: white;
+            border-radius: 14px;
+            padding: 16px 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            text-align: center;
+            border: 1px solid #eef0f4;
+        }
+        .stats-summary .stat-card .number {
+            font-size: 26px;
+            font-weight: 700;
+            color: #2d3748;
+        }
+        .stats-summary .stat-card .label {
+            font-size: 13px;
+            color: #8895aa;
+            margin-top: 4px;
+        }
+        .table-wrapper {
+            background: white;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+        }
+        .table-wrapper .table-header {
+            padding: 18px 24px;
+            background: #fafbfc;
+            border-bottom: 1px solid #eef0f4;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .table-wrapper .table-header .title {
+            font-weight: 600;
+            font-size: 16px;
+            color: #2d3748;
+        }
+        .table-wrapper .table-header .title span {
+            color: #8895aa;
+            font-weight: 400;
+            font-size: 14px;
+        }
+        .table-wrapper .table-responsive {
+            padding: 0 4px 4px 4px;
+        }
+        .table-wrapper table {
+            margin-bottom: 0;
+            font-size: 14px;
+        }
+        .table-wrapper table th {
+            background: #f7f8fc;
+            color: #4a5568;
+            font-weight: 600;
+            font-size: 13px;
+            border-bottom: 2px solid #eef0f4;
+            padding: 14px 12px;
+            white-space: nowrap;
+        }
+        .table-wrapper table td {
+            padding: 16px 12px;
+            vertical-align: middle;
+            border-bottom: 1px solid #f0f2f5;
+        }
+        .table-wrapper table tr:last-child td { border-bottom: none; }
+        .table-wrapper table tr:hover td { background: #fafbfc; }
+
+        .video-title {
+            font-weight: 500;
+            color: #2d3748;
+            max-width: 260px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            display: inline-block;
+        }
+        .video-title a { color: #2d3748; text-decoration: none; }
+        .video-title a:hover { color: #fb7299; text-decoration: underline; }
+
+        .author-name {
+            color: #4a5568;
+            font-size: 13px;
+        }
+
+        .badge-achieved {
+            background: #48bb78;
+            color: white;
+            padding: 4px 14px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 13px;
+        }
+        .badge-not-achieved {
+            background: #fc8181;
+            color: white;
+            padding: 4px 14px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 13px;
+        }
+        .badge-pending {
+            background: #ecc94b;
+            color: #744210;
+            padding: 4px 14px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 13px;
+        }
+
+        .target-input-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .target-input-group input {
+            width: 100px;
+            padding: 4px 8px;
+            border: 2px solid #e8ecf1;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        .target-input-group input:focus {
+            border-color: #fb7299;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(251, 114, 153, 0.12);
+        }
+        .target-input-group .btn-sm {
+            border-radius: 8px;
+            padding: 4px 12px;
+            font-size: 13px;
+        }
+
+        .refresh-btn {
+            color: #4a5568;
+            background: none;
+            border: none;
+            padding: 4px 12px;
+            border-radius: 8px;
+            transition: all 0.3s;
+            font-size: 13px;
+        }
+        .refresh-btn:hover {
+            background: #f0f2f5;
+            color: #fb7299;
+        }
+        .refresh-btn .spinner { display: none; }
+        .refresh-btn.loading .spinner { display: inline-block; }
+        .refresh-btn.loading .text { display: none; }
+
+        .last-updated {
+            font-size: 12px;
+            color: #a0aec0;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #8895aa;
+        }
+        .empty-state .icon { font-size: 48px; margin-bottom: 16px; }
+
+        @media (max-width: 768px) {
+            body { padding: 12px; }
+            .nav-bar { padding: 12px 16px; flex-direction: column; align-items: stretch; }
+            .table-wrapper .table-header { flex-direction: column; align-items: stretch; }
+            .table-wrapper table { font-size: 12px; }
+            .table-wrapper table th, .table-wrapper table td { padding: 10px 8px; }
+            .video-title { max-width: 120px; }
+            .target-input-group input { width: 70px; }
+            .stats-summary { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- 导航栏 -->
+        <div class="nav-bar">
+            <a href="/" class="brand">
+                <i class="bi bi-arrow-left"></i> 返回查询
+            </a>
+            <div>
+                {% if is_fav %}
+                <span class="info-badge"><i class="bi bi-folder"></i> 收藏夹 #{{ fav_id }} · {{ data|length }} 个视频</span>
+                {% else %}
+                <span class="info-badge"><i class="bi bi-film"></i> {{ data[0].video.title if data else '' }}</span>
+                {% endif %}
+                <button class="btn btn-outline-secondary btn-sm ms-2" onclick="refreshAll()">
+                    <i class="bi bi-arrow-clockwise"></i> 全部刷新
+                </button>
+            </div>
+        </div>
+
+        <!-- 汇总统计 -->
+        {% if data %}
+        {% set total_videos = data|length %}
+        {% set total_views = data|sum(attribute='stat.current_views')|int %}
+        {% set total_growth = data|sum(attribute='growth')|int %}
+        {% set achieved_count = data|selectattr('achieved', 'equalto', True)|list|length %}
+        <div class="stats-summary">
+            <div class="stat-card">
+                <div class="number">{{ total_videos }}</div>
+                <div class="label">📹 视频总数</div>
+            </div>
+            <div class="stat-card">
+                <div class="number">{{ "{:,}".format(total_views) }}</div>
+                <div class="label">👁️ 总播放量</div>
+            </div>
+            <div class="stat-card">
+                <div class="number" style="color: #48bb78;">+{{ "{:,}".format(total_growth) }}</div>
+                <div class="label">📈 总增长</div>
+            </div>
+            <div class="stat-card">
+                <div class="number" style="color: #fb7299;">{{ achieved_count }}/{{ total_videos }}</div>
+                <div class="label">🎯 达标数</div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- 数据表格 -->
+        <div class="table-wrapper">
+            <div class="table-header">
+                <div class="title">
+                    📊 播放量数据
+                    <span>· 今日初始播放量为当日0点或首次记录值</span>
+                </div>
+                <div class="last-updated">
+                    <i class="bi bi-clock"></i> 数据实时刷新
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table" id="data-table">
+                    <thead>
+                        <tr>
+                            <th style="width:40px;">#</th>
+                            <th style="min-width:180px;">标题</th>
+                            <th style="min-width:80px;">作者</th>
+                            <th style="min-width:110px;">初始播放量</th>
+                            <th style="min-width:110px;">当前播放量</th>
+                            <th style="min-width:90px;">今日增长</th>
+                            <th style="min-width:160px;">目标</th>
+                            <th style="min-width:80px;">是否达标</th>
+                            <th style="width:100px;">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in data %}
+                        <tr id="row-{{ item.video.id }}">
+                            <td>{{ loop.index }}</td>
+                            <td>
+                                <span class="video-title">
+                                    <a href="{{ item.video.url }}" target="_blank" title="{{ item.video.title }}">
+                                        {{ item.video.title[:50] }}{% if item.video.title|length > 50 %}...{% endif %}
+                                    </a>
+                                </span>
+                            </td>
+                            <td>
+                                <span class="author-name">{{ item.video.author }}</span>
+                            </td>
+                            <td id="initial-{{ item.video.id }}">
+                                {{ "{:,}".format(item.stat.initial_views) }}
+                            </td>
+                            <td id="current-{{ item.video.id }}">
+                                <strong>{{ "{:,}".format(item.stat.current_views) }}</strong>
+                            </td>
+                            <td id="growth-{{ item.video.id }}" style="font-weight:600; color: {% if item.growth > 0 %}#48bb78{% elif item.growth < 0 %}#fc8181{% else %}#a0aec0{% endif %};">
+                                {% if item.growth > 0 %}+{% endif %}{{ "{:,}".format(item.growth) }}
+                            </td>
+                            <td>
+                                <div class="target-input-group">
+                                    <input type="number" 
+                                           id="target-input-{{ item.video.id }}" 
+                                           value="{{ item.stat.target if item.stat.target > 0 else '' }}"
+                                           placeholder="0"
+                                           min="0"
+                                           step="1000">
+                                    <button class="btn btn-outline-primary btn-sm" onclick="updateTarget({{ item.video.id }})">
+                                        <i class="bi bi-check2"></i>
+                                    </button>
+                                </div>
+                            </td>
+                            <td id="achieved-{{ item.video.id }}">
+                                {% if item.stat.target > 0 %}
+                                    {% if item.achieved %}
+                                    <span class="badge-achieved">✅ 达标</span>
+                                    {% else %}
+                                    <span class="badge-not-achieved">❌ 未达标</span>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="badge-pending">⏳ 未设置</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <button class="refresh-btn" onclick="refreshVideo({{ item.video.id }})" id="refresh-btn-{{ item.video.id }}">
+                                    <span class="text"><i class="bi bi-arrow-clockwise"></i> 刷新</span>
+                                    <span class="spinner"><i class="bi bi-hourglass-split"></i></span>
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div style="margin-top: 20px; text-align: center; color: #a0aec0; font-size: 13px;">
+            <i class="bi bi-info-circle"></i> 点击「刷新」更新当前播放量 · 设置目标后自动判断是否达标
+        </div>
+    </div>
+
+    <script>
+        // ========== 刷新单个视频 ==========
+        async function refreshVideo(videoId) {
+            const btn = document.getElementById(`refresh-btn-${videoId}`);
+            if (!btn) return;
+            
+            btn.classList.add('loading');
+            btn.disabled = true;
+
+            try {
+                const resp = await fetch('/api/refresh', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ video_id: videoId })
+                });
+                const result = await resp.json();
+
+                if (result.success) {
+                    const d = result.data;
+                    // 更新当前播放量
+                    document.getElementById(`current-${videoId}`).innerHTML = `<strong>${formatNumber(d.current_views)}</strong>`;
+                    // 更新增长
+                    const growthEl = document.getElementById(`growth-${videoId}`);
+                    const growth = d.growth;
+                    growthEl.textContent = (growth > 0 ? '+' : '') + formatNumber(growth);
+                    growthEl.style.color = growth > 0 ? '#48bb78' : growth < 0 ? '#fc8181' : '#a0aec0';
+                    // 更新达标状态
+                    updateAchieved(videoId, d.achieved, d.target);
+                    // 更新初始播放量（可能跨天变化）
+                    if (d.initial_views !== undefined) {
+                        document.getElementById(`initial-${videoId}`).textContent = formatNumber(d.initial_views);
+                    }
+                    // 显示成功提示（简单的闪烁）
+                    const row = document.getElementById(`row-${videoId}`);
+                    row.style.transition = 'background 0.3s';
+                    row.style.background = '#f0fff4';
+                    setTimeout(() => { row.style.background = ''; }, 800);
+                } else {
+                    alert('刷新失败: ' + (result.error || '未知错误'));
+                }
+            } catch (e) {
+                alert('请求失败: ' + e.message);
+            } finally {
+                btn.classList.remove('loading');
+                btn.disabled = false;
+            }
+        }
+
+        // ========== 全部刷新 ==========
+        async function refreshAll() {
+            const rows = document.querySelectorAll('#data-table tbody tr');
+            const videoIds = [];
+            rows.forEach(row => {
+                const id = row.id.replace('row-', '');
+                if (id) videoIds.push(parseInt(id));
+            });
+
+            if (videoIds.length === 0) return;
+
+            // 逐个刷新
+            for (const vid of videoIds) {
+                await refreshVideo(vid);
+                // 间隔0.5秒避免请求过快
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+        }
+
+        // ========== 更新目标 ==========
+        async function updateTarget(videoId) {
+            const input = document.getElementById(`target-input-${videoId}`);
+            const target = parseInt(input.value);
+
+            if (isNaN(target) || target < 0) {
+                alert('请输入有效的目标值（大于等于0的整数）');
+                return;
+            }
+
+            try {
+                const resp = await fetch('/api/update_target', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ video_id: videoId, target: target })
+                });
+                const result = await resp.json();
+
+                if (result.success) {
+                    const d = result.data;
+                    updateAchieved(videoId, d.achieved, target);
+                    // 显示成功提示
+                    const inputEl = document.getElementById(`target-input-${videoId}`);
+                    inputEl.style.borderColor = '#48bb78';
+                    setTimeout(() => { inputEl.style.borderColor = ''; }, 800);
+                } else {
+                    alert('更新目标失败: ' + (result.error || '未知错误'));
+                }
+            } catch (e) {
+                alert('请求失败: ' + e.message);
+            }
+        }
+
+        // ========== 更新达标状态 ==========
+        function updateAchieved(videoId, achieved, target) {
+            const el = document.getElementById(`achieved-${videoId}`);
+            if (!el) return;
+
+            if (target > 0) {
+                if (achieved) {
+                    el.innerHTML = '<span class="badge-achieved">✅ 达标</span>';
+                } else {
+                    el.innerHTML = '<span class="badge-not-achieved">❌ 未达标</span>';
+                }
+            } else {
+                el.innerHTML = '<span class="badge-pending">⏳ 未设置</span>';
+            }
+        }
+
+        // ========== 工具函数 ==========
+        function formatNumber(num) {
+            return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        }
+
+        // 支持按回车键更新目标
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && e.target && e.target.id && e.target.id.startsWith('target-input-')) {
+                const videoId = parseInt(e.target.id.replace('target-input-', ''));
+                if (!isNaN(videoId)) {
+                    updateTarget(videoId);
+                }
+            }
+        });
+
+        // 页面加载后自动刷新所有视频（可选）
+        // 等待页面加载完成后执行
+        document.addEventListener('DOMContentLoaded', function() {
+            // 如果需要自动刷新，取消下面注释
+            // setTimeout(refreshAll, 2000);
+        });
+    </script>
+</body>
+</html>
